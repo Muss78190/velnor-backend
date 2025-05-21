@@ -1,29 +1,34 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from pydantic import BaseModel
+from dotenv import load_dotenv
 import stripe
 import os
-from dotenv import load_dotenv
 
+# Charger les variables d'environnement
 load_dotenv()
+
 app = FastAPI()
 
+# Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-# CORS (permet au front d'accéder au back)
+# Autoriser le frontend à accéder à l'API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # à restreindre à ton domaine si besoin
+    allow_origins=["*"],  # À restreindre à https://www.velnor.fr si tu veux plus tard
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# 🔵 PAGE TEST (racine)
 @app.get("/")
 def read_root():
     return {"message": "Backend VELNOR opérationnel"}
 
-# ✅ Route 24h
+# ✅ PAIEMENT 24h
 @app.post("/create-checkout-session-24h")
 async def create_checkout_session_24h():
     try:
@@ -41,7 +46,7 @@ async def create_checkout_session_24h():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ✅ Route 48h
+# ✅ PAIEMENT 48h
 @app.post("/create-checkout-session-48h")
 async def create_checkout_session_48h():
     try:
@@ -58,3 +63,37 @@ async def create_checkout_session_48h():
         return {"url": session.url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ✅ SCAN IA (admin)
+class ScanRequest(BaseModel):
+    url: str
+
+@app.post("/scan")
+def scan_url(data: ScanRequest):
+    url = data.url
+
+    # 🔍 Simulation d’un audit
+    fake_score = 82
+    fake_resume = "Audit terminé avec 3 failles critiques détectées."
+    recommendations = [
+        "Mettre à jour le CMS.",
+        "Configurer les headers de sécurité.",
+        "Restreindre les accès aux ports exposés."
+    ]
+
+    pdf_path = "/rapport-audit-fictif.pdf"
+
+    return {
+        "url": url,
+        "score": fake_score,
+        "resume": fake_resume,
+        "recommendations": recommendations,
+        "pdf": pdf_path
+    }
+
+@app.get("/rapport-audit-fictif.pdf")
+def get_fake_pdf():
+    file_path = os.path.join(os.getcwd(), "rapport-audit-fictif.pdf")
+    if os.path.exists(file_path):
+        return FileResponse(path=file_path, filename="rapport-audit-fictif.pdf", media_type='application/pdf')
+    return {"error": "Fichier PDF non trouvé"}
