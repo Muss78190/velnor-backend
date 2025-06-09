@@ -1,7 +1,6 @@
-# main.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import stripe
@@ -22,7 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Stripe
+# Stripe config
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 @app.get("/")
@@ -35,11 +34,12 @@ class ScanRequest(BaseModel):
 @app.post("/scan")
 def scan_url(data: ScanRequest):
     try:
+        print(f"[•] Analyse reçue pour : {data.url}")
         result = analyse_cybersec(data.url)
 
-        # Générer un PDF dynamique et unique
         filename = f"audit_{uuid.uuid4().hex[:8]}.pdf"
-        path = generate_pdf_report(result, filename)
+        pdf_path = os.path.join("rapports", filename)
+        generate_pdf_report(result, pdf_path)
 
         result["pdf"] = f"/rapports/{filename}"
         return result
