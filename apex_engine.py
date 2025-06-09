@@ -1,13 +1,35 @@
+# apex_engine.py
+
 import re
+import time
 import requests
+import nmap
+from zapv2 import ZAPv2
+
+# ==== BASES DE DONNÉES ====
 
 CVE_DATABASE = {
-    "Apache/2.4.49": {"cve": "CVE-2021-41773", "critique": True, "description": "Faille RCE via path traversal."},
-    "nginx/1.20.1": {"cve": "CVE-2021-23017", "critique": True, "description": "Vulnérabilité sur en-tête HTTP."},
-    "OpenSSH_7.2p2": {"cve": "CVE-2016-10009", "critique": False, "description": "Injection via scp."}
+    "Apache/2.4.49": {
+        "cve": "CVE-2021-41773",
+        "critique": True,
+        "description": "Faille RCE via path traversal."
+    },
+    "nginx/1.20.1": {
+        "cve": "CVE-2021-23017",
+        "critique": True,
+        "description": "Vulnérabilité sur en-tête HTTP."
+    },
+    "OpenSSH_7.2p2": {
+        "cve": "CVE-2016-10009",
+        "critique": False,
+        "description": "Injection via scp."
+    }
 }
 
-COMMON_PATHS = ["/admin", "/login", "/.git", "/backup", "/db.sql", "/config", "/.env"]
+COMMON_PATHS = [
+    "/admin", "/login", "/.git", "/backup", "/db.sql", "/config", "/.env"
+]
+
 HEADERS_SECURITE = {
     "Content-Security-Policy": "Protège contre XSS",
     "Strict-Transport-Security": "Force HTTPS",
@@ -17,114 +39,159 @@ HEADERS_SECURITE = {
     "Permissions-Policy": "Limite accès aux API"
 }
 
+
+# ==== FONCTION PRINCIPALE ====
+
 def analyse_cybersec(url: str):
-    score_vectoriel = {
-        "ports": 0, "services_critiques": 0, "cve": 0,
-        "headers": 0, "html": 0, "cms": 0, "chemins": 0,
-        "xss_sqli": 0, "js_dangereux": 0, "fichiers_exposes": 0
-    }
-    recommandations = []
+    """
+    Analyse complète de cybersécurité :
+      - scan Nmap (ports)
+      - spider + active scan ZAP
+      - vérification HTTP (headers, payloads, fichiers exposés)
+      - détection de CVE connues
+      - scoring global et recommandations
+    """
+
+    # Initialisation
     anomalies = []
+    recommandations = []
+    score = {
+        "ports": 0,
+        "zapprobe": 0,
+        "headers": 0,
+        "cve": 0,
+        "xss_sqli": 0,
+        "chemins": 0,
+        "html": 0,
+        "fichiers_exposes": 0
+    }
 
-    # Ports simulés
-    ports = [("80", "http"), ("443", "https")]
-    for port, service in ports:
-        anomalies.append(f"Port {port}/tcp ouvert : {service}")
-        score_vectoriel["ports"] += 3
-        if service in ["ftp", "telnet", "ssh", "smtp", "mysql", "rdp"]:
-            recommandations.append(f"🚨 Service critique ouvert : {service.upper()} sur {port}")
-            score_vectoriel["services_critiques"] += 7
-
-    # CVE simulées
-    for version, data in CVE_DATABASE.items():
-        if version in url:
-            anomalies.append(f"{version} → Vulnérabilité connue ({data['cve']})")
-            score_vectoriel["cve"] += 15 if data["critique"] else 7
-            recommandations.append(f"{'🚨' if data['critique'] else '⚠️'} {version} vulnérable : {data['description']}")
-
+    # 1) SCAN DE PORTS AVEC NMAP
     try:
-        r = requests.get(url, timeout=6)
-        headers = r.headers
-        content = r.text.lower()
+        nm = nmap.PortScanner()
+        target = url.replace("https://", "").replace("http://", "").split("/")[0]
+        nm.scan(hosts=target, arguments="-Pn -p 1-1024")
+        for host in nm.all_hosts():
+            for proto in nm[host].all_protocols():
+                for port, info in nm[host][proto].items():
+                    state = info["state"]
+                    anomalies.append(f"Port {port}/{proto} → {state}")
+                    if state == "open":
+                        score["ports"] += 3
+    except Exception as e:
+        anomalies.append(f"Erreur Nmap : {e}")
 
-        for h, why in HEADERS_SECURITE.items():
+    # 2) SPIDER + ACTIVE SCAN OWASP ZAP
+    try:
+        zap = ZAPv2(proxies={"http": "http://127.0.0.1:8090", "https": "http://127.0.0.1:8090"})
+        zap.urlopen(url)
+        time.sleep(2)
+
+        # Spider
+        spider_id = zap.spider.scan(url)
+        while int(zap.spider.status(spider_id)) < 100:
+            time.sleep(1)
+
+        # Active scan
+        ascan_id = zap.ascan.scan(url)
+        while int(zap.ascan.status(ascan_id)) < 100:
+            time.sleep(2)
+
+        # Récupère les alertes
+        for alert in zap.core.alerts(baseurl=url):
+            risk = alert["risk"]       # "Low", "Medium", "High"
+            anomalies.append(f"ZAP [{risk}] : {alert['alert']}")
+            recommandations.append(f"Solution ZAP : {alert['solution']}")
+            # Pondération simple selon criticité
+            score["zapprobe"] += {"Low": 5, "Medium": 10, "High": 15}[risk]
+    except Exception as e:
+        anomalies.append(f"Erreur ZAP : {e}")
+
+    # 3) ANALYSE HTTP (headers, contenu, payloads)
+    try:
+        resp = requests.get(url, timeout=10)
+        headers = resp.headers
+        content = resp.text.lower()
+
+        # a) Headers de sécurité manquants
+        for h, desc in HEADERS_SECURITE.items():
             if h not in headers:
-                recommandations.append(f"🔐 Header manquant : {h} ({why})")
-                score_vectoriel["headers"] += 5
+                recommandations.append(f"Header manquant : {h} ({desc})")
+                score["headers"] += 5
 
-        techno = []
-        if "x-powered-by" in headers:
-            techno.append(headers["x-powered-by"])
-        if "<meta name=\"generator\"" in content:
-            match = re.search(r'<meta name="generator" content="([^"]+)', content)
-            if match:
-                techno.append(match.group(1))
-        if "wp-content" in content or "wordpress" in content:
-            techno.append("WordPress")
-        if "laravel" in content or "symfony" in content:
-            techno.append("Laravel/Symfony")
-        if techno:
-            recommandations.append(f"ℹ️ Technologies détectées : {', '.join(set(techno))}")
-            score_vectoriel["cms"] += 5
+        # b) CVE connues
+        server_hdr = headers.get("Server", "")
+        for version, info in CVE_DATABASE.items():
+            if version in server_hdr or version.lower() in content:
+                crit = info["critique"]
+                anomalies.append(f"{version} → {info['cve']}")
+                score["cve"] += 15 if crit else 7
+                recommandations.append(f"{info['description']}")
 
-        if any(js in content for js in ["eval(", "document.write", "innerhtml"]):
-            anomalies.append("⚠️ JS potentiellement dangereux trouvé")
-            score_vectoriel["js_dangereux"] += 6
-            recommandations.append("⚠️ Nettoyez vos scripts JS (évitez eval, document.write...)")
+        # c) JS dangereux
+        for pattern in ["eval(", "document.write", "innerhtml"]:
+            if pattern in content:
+                anomalies.append("⚠️ JS potentiellement dangereux")
+                score["xss_sqli"] += 6
+                recommandations.append("Sanbox ou nettoyage des scripts JS")
 
-        accessibles = []
+        # d) Paths sensibles
+        found = []
         for path in COMMON_PATHS:
             try:
-                resp = requests.get(url.rstrip("/") + path, timeout=3)
-                if resp.status_code == 200:
-                    accessibles.append(path)
-                    score_vectoriel["chemins"] += 4
+                r = requests.get(url.rstrip("/") + path, timeout=4)
+                if r.status_code == 200:
+                    found.append(path)
+                    score["chemins"] += 4
             except:
-                continue
-        if accessibles:
-            recommandations.append(f"🚫 Chemins sensibles accessibles : {', '.join(accessibles)}")
+                pass
+        if found:
+            recommandations.append("Chemins sensibles accessibles : " + ", ".join(found))
 
+        # e) XSS / SQLi basique
         payloads = {"XSS": "<script>alert(1)</script>", "SQLi": "' OR '1'='1"}
-        for name, payload in payloads.items():
+        for name, pl in payloads.items():
             try:
-                res = requests.get(url, params={"v": payload}, timeout=4)
-                if payload in res.text:
-                    recommandations.append(f"⚠️ Vulnérabilité {name} détectée via GET")
-                    score_vectoriel["xss_sqli"] += 10
+                r = requests.get(url, params={"v": pl}, timeout=5)
+                if pl in r.text:
+                    anomalies.append(f"⚠️ Vulnérabilité {name} détectée")
+                    score["xss_sqli"] += 10
             except:
-                continue
+                pass
 
-        exposés = []
+        # f) Fichiers exposés
+        exposed = []
         for f in [".env", ".git", "config.php", "backup.sql"]:
             try:
-                res = requests.get(url.rstrip("/") + "/" + f, timeout=3)
-                if res.status_code == 200 and len(res.text) > 20:
-                    exposés.append(f)
-                    score_vectoriel["fichiers_exposes"] += 6
+                r = requests.get(url.rstrip("/") + "/" + f, timeout=4)
+                if r.status_code == 200 and len(r.text) > 20:
+                    exposed.append(f)
+                    score["fichiers_exposes"] += 6
             except:
-                continue
-        if exposés:
-            anomalies.append(f"📂 Fichiers sensibles exposés : {', '.join(exposés)}")
-            recommandations.append("🚨 Supprimez ou protégez ces fichiers immédiatement.")
-
+                pass
+        if exposed:
+            anomalies.append("Fichiers exposés : " + ", ".join(exposed))
+            recommandations.append("Protégez ou supprimez ces fichiers")
     except Exception as e:
-        anomalies.append(f"🌐 Erreur HTTP : {e}")
-        score_vectoriel["html"] += 5
+        anomalies.append(f"Erreur HTTP : {e}")
+        score["html"] += 5
 
-    score = max(0, 100 - sum(score_vectoriel.values()))
+    # 4) CALCUL DU SCORE & RÉSUMÉ
+    total_penalty = sum(score.values())
+    final_score = max(0, 100 - total_penalty)
 
-    if score >= 90:
+    if final_score >= 90:
         resume = "✅ Site globalement sécurisé."
-    elif score >= 70:
+    elif final_score >= 70:
         resume = "⚠️ Quelques failles à corriger."
-    elif score >= 50:
+    elif final_score >= 50:
         resume = "⚠️ Plusieurs vulnérabilités détectées."
     else:
-        resume = "❌ Site à risque élevé. Intervention urgente recommandée."
+        resume = "❌ Site à risque élevé. Intervention urgente requise."
 
     return {
         "url": url,
-        "score": score,
+        "score": final_score,
         "resume": resume,
         "anomalies": anomalies,
         "recommendations": recommandations

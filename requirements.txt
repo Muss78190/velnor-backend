@@ -1,5 +1,8 @@
 fastapi
-stripe
-uvicorn
+uvicorn[standard]
 python-dotenv
-reportlab
+stripe
+requests
+python-nmap
+python-owasp-zap-v2.4
+
