@@ -10,9 +10,13 @@ import uuid
 from apex_engine import analyse_cybersec
 from pdf_generator import generate_pdf_report
 
+# Chargement des variables d'environnement
 load_dotenv()
+
+# Initialisation FastAPI
 app = FastAPI()
 
+# Middleware CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,13 +25,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Stripe config
+# Configuration Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 @app.get("/")
 def root():
     return {"message": "VELNOR backend opérationnel"}
 
+# Modèle de requête
 class ScanRequest(BaseModel):
     url: str
 
@@ -37,12 +42,19 @@ def scan_url(data: ScanRequest):
         print(f"[•] Analyse reçue pour : {data.url}")
         result = analyse_cybersec(data.url)
 
+        # Création du dossier de sortie si besoin
+        output_dir = "rapports"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Génération du nom de fichier et du PDF
         filename = f"audit_{uuid.uuid4().hex[:8]}.pdf"
-        pdf_path = os.path.join("rapports", filename)
+        pdf_path = os.path.join(output_dir, filename)
         generate_pdf_report(result, pdf_path)
 
+        # Réponse API avec chemin du PDF
         result["pdf"] = f"/rapports/{filename}"
         return result
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur IA : {str(e)}")
 
