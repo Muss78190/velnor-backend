@@ -48,6 +48,8 @@ def scan_url(data: ScanRequest):
 
         # Génération du nom de fichier et du PDF
         filename = f"audit_{uuid.uuid4().hex[:8]}.pdf"
+        output_dir = "rapports"
+        os.makedirs(output_dir, exist_ok=True)
         pdf_path = os.path.join(output_dir, filename)
         generate_pdf_report(result, pdf_path)
 
