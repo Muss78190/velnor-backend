@@ -1,18 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-main.py – Backend FastAPI pour VELNOR
-
-Dépendances Python :
-    pip install fastapi uvicorn python-dotenv stripe pydantic weasyprint apex-engine pdf-generator
-
-Dépendances système (WeasyPrint sous Debian/Ubuntu) :
-    sudo apt-get install libpango-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info
-
-Variables d'environnement requises (.env) :
-    STRIPE_SECRET_KEY, STRIPE_PRICE_24H, STRIPE_PRICE_48H,
-    STRIPE_SUCCESS_URL (optionnel), STRIPE_CANCEL_URL (optionnel),
-    CORS_ORIGINS (optionnel, séparées par des virgules)
-"""
 import os
 import uuid
 import logging
