@@ -4,7 +4,10 @@ import re
 import time
 import requests
 import nmap
+import urllib3
 from zapv2 import ZAPv2
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ==== BASES DE DONNÉES ====
 
@@ -83,7 +86,13 @@ def analyse_cybersec(url: str):
 
     # 2) SPIDER + ACTIVE SCAN OWASP ZAP
     try:
-        zap = ZAPv2(proxies={"http": "http://127.0.0.1:8090", "https": "http://127.0.0.1:8090"})
+        zap = ZAPv2(
+            proxies={
+                "http": "http://127.0.0.1:8090",
+                "https": "http://127.0.0.1:8090"
+            },
+            insecure=True
+        )
         zap.urlopen(url)
         time.sleep(2)
 
@@ -102,7 +111,6 @@ def analyse_cybersec(url: str):
             risk = alert["risk"]       # "Low", "Medium", "High"
             anomalies.append(f"ZAP [{risk}] : {alert['alert']}")
             recommandations.append(f"Solution ZAP : {alert['solution']}")
-            # Pondération simple selon criticité
             score["zapprobe"] += {"Low": 5, "Medium": 10, "High": 15}[risk]
     except Exception as e:
         anomalies.append(f"Erreur ZAP : {e}")
