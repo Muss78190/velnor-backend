@@ -91,7 +91,6 @@ def analyse_cybersec(url: str):
                 "http": "http://127.0.0.1:8090",
                 "https": "http://127.0.0.1:8090"
             },
-            insecure=True
         )
         zap.urlopen(url)
         time.sleep(2)
