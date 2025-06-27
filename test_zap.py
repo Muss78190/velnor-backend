@@ -1,8 +1,12 @@
-from zapv2 import ZAPv2
+import requests
 
-# Connexion à ZAP via le proxy en localhost:8090
-zap = ZAPv2(proxies={'http': 'http://127.0.0.1:8090', 'https': 'http://127.0.0.1:8090'})
+proxies = {
+    "http": "http://127.0.0.1:8090",
+    "https": "http://127.0.0.1:8090"
+}
 
-# Vérifie la connexion
-print("Connexion réussie à ZAP !")
-print("Version ZAP :", zap.core.version)
+try:
+    response = requests.get("https://www.google.com", proxies=proxies, verify=False, timeout=10)
+    print("[✅] Réponse ZAP proxy : ", response.status_code)
+except Exception as e:
+    print("[❌] ZAP proxy ne répond pas :", e)

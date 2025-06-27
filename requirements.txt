@@ -1,9 +1,49 @@
-fastapi
-uvicorn[standard]
-python-dotenv
-stripe
-requests
-python-nmap
-python-owasp-zap-v2.4
-reportlab
+# VELNOR Backend Dependencies - Version consolidée
+# ================================================
 
+# Core FastAPI & Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Security & HTTP
+requests==2.31.0
+urllib3==2.0.7
+
+# Payment Processing
+stripe==7.8.0
+
+# Security Analysis Tools
+python-nmap==0.7.1
+zaproxy==0.1.0
+# Note: nmap système doit être installé séparément
+
+# PDF & Document Generation
+reportlab==4.0.7
+Pillow==10.1.0
+PyPDF2==3.0.1
+python-docx==0.8.11
+
+# Environment & Configuration
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Date & Time utilities
+python-dateutil==2.8.2
+
+# Authentication & JWT
+pyjwt==2.8.0
+
+# Logging & Monitoring
+structlog==23.2.0
+
+# Optional: Enhanced error tracking & monitoring
+sentry-sdk[fastapi]==1.38.0
+
+# Threading & Async (généralement inclus avec Python 3.7+)
+# asyncio==3.4.3  # Commenté car inclus dans Python standard
+
+# Additional useful packages for cybersecurity
+python-whois==0.8.0  # Pour info domaine
+dnspython==2.4.2     # Pour résolution DNS
+cryptography==41.0.7 # Pour analyse crypto
