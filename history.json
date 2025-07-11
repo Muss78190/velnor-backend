@@ -1,0 +1,1 @@
+{"cible": "https://www.trappes.fr/", "date": "2025-05-12 23:57:34", "ports_ouverts": [80, 443], "faille_critique": true, "score": 65, "recommendations": ["Mettre \u00e0 jour Apache vers la derni\u00e8re version", "Activer HTTP Strict Transport Security (HSTS)", "Limiter l'acc\u00e8s aux fichiers .git"]}

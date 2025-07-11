@@ -8,7 +8,7 @@ from typing import Any, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request  # ⭐ AJOUTÉ Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -22,20 +22,35 @@ from pdf_generator import generate_pdf_report
 # Chargement des variables d'environnement
 load_dotenv()
 
-# STRIPE
+# STRIPE - Configuration sécurisée
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_PRICE_24H = os.getenv("STRIPE_PRICE_24H", "price_XXX")
 STRIPE_PRICE_48H = os.getenv("STRIPE_PRICE_48H", "price_YYY")
 STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "https://velnor.fr/success")
 STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "https://velnor.fr/cancel")
 
+# ⭐ VALIDATION ET CONFIGURATION STRIPE
+if not STRIPE_SECRET_KEY:
+    print("❌ ERREUR CRITIQUE: STRIPE_SECRET_KEY manquante dans .env")
+    raise ValueError("STRIPE_SECRET_KEY est obligatoire pour démarrer l'application")
+
+# Configuration de l'API Stripe
+stripe.api_key = STRIPE_SECRET_KEY
+print(f"✅ Stripe configuré avec clé: {STRIPE_SECRET_KEY[:20]}...")
+
+# Debug info (à retirer en production)
+print(f"🔑 STRIPE_SECRET_KEY chargée: {STRIPE_SECRET_KEY[:20]}...")
+print(f"📁 Répertoire de travail: {os.getcwd()}")
+print(f"📄 Fichier .env existe: {os.path.exists('.env')}")
+
 # Logger global
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("velnor")
 
-# App
+# App FastAPI
 app = FastAPI(title="VELNOR API", version="2.0.0")
 
+# Configuration CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"https://.*\.?velnor\.fr",
@@ -65,6 +80,13 @@ class ScanResponse(BaseModel):
     status: str
     task_id: str
     message: str
+
+# ⭐ NOUVEAU MODÈLE pour les paiements
+class CheckoutRequest(BaseModel):
+    url: str
+    email: str
+    nom: str
+    entreprise: str = ""  # Optionnel
 
 @app.get("/")
 def root() -> Dict[str, str]:
@@ -469,36 +491,147 @@ def get_scan_status(task_id: str) -> Dict[str, Any]:
         logger.error(f"[{task_id}] Erreur status: {str(e)}")
         return {"status": "error", "task_id": task_id}
 
-# Endpoints Stripe inchangés (déjà fonctionnels)
+# ⭐ ENDPOINTS STRIPE CORRIGÉS
 @app.post("/create-checkout-session-24h")
-def checkout_24h() -> Dict[str, str]:
+def checkout_24h(data: CheckoutRequest) -> Dict[str, str]:
+    """
+    Crée une session Stripe pour l'audit 24h avec les données client
+    """
     try:
+        # ⭐ LIGNES DE DEBUG
+        logger.info(f"🔍 DEBUG 24h: stripe.api_key dans fonction = {stripe.api_key[:20] if stripe.api_key else 'AUCUNE'}...")
+        logger.info(f"🔍 DEBUG 24h: STRIPE_SECRET_KEY variable = {STRIPE_SECRET_KEY[:20] if STRIPE_SECRET_KEY else 'AUCUNE'}...")
+        
+        # ⭐ FORCE LA CLÉ
+        stripe.api_key = STRIPE_SECRET_KEY
+        logger.info(f"🔍 DEBUG 24h: Après force = {stripe.api_key[:20] if stripe.api_key else 'AUCUNE'}...")
+        
+        logger.info(f"🚀 Création session 24h pour: {data.url} - {data.email}")
+        
+        # Validation basique URL
+        if not data.url or not data.url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=400, detail="URL invalide - doit commencer par http:// ou https://")
+        
+        # Validation email basique
+        if "@" not in data.email:
+            raise HTTPException(status_code=400, detail="Email invalide")
+        
+        # Création session Stripe avec métadonnées
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{"price": STRIPE_PRICE_24H, "quantity": 1}],
             mode="payment",
-            success_url=STRIPE_SUCCESS_URL,
+            success_url=STRIPE_SUCCESS_URL + "?session_id={CHECKOUT_SESSION_ID}",
             cancel_url=STRIPE_CANCEL_URL,
+            customer_email=data.email,
+            metadata={
+                "url": data.url,
+                "nom": data.nom,
+                "entreprise": data.entreprise,
+                "type": "audit_24h",
+                "email": data.email
+            }
         )
+        
+        logger.info(f"✅ Session Stripe 24h créée: {session.id}")
         return {"url": session.url}
+        
+    except stripe.error.StripeError as e:
+        logger.error(f"❌ Erreur Stripe 24h: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur Stripe: {str(e)}")
     except Exception as e:
-        logger.exception("Erreur Stripe 24h")
+        logger.error(f"❌ Erreur générale 24h: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/create-checkout-session-48h")
-def checkout_48h() -> Dict[str, str]:
+def checkout_48h(data: CheckoutRequest) -> Dict[str, str]:
+    """
+    Crée une session Stripe pour l'audit 48h avec les données client
+    """
     try:
+        # ⭐ LIGNES DE DEBUG
+        logger.info(f"🔍 DEBUG 48h: stripe.api_key dans fonction = {stripe.api_key[:20] if stripe.api_key else 'AUCUNE'}...")
+        logger.info(f"🔍 DEBUG 48h: STRIPE_SECRET_KEY variable = {STRIPE_SECRET_KEY[:20] if STRIPE_SECRET_KEY else 'AUCUNE'}...")
+        
+        # ⭐ FORCE LA CLÉ
+        stripe.api_key = STRIPE_SECRET_KEY
+        logger.info(f"🔍 DEBUG 48h: Après force = {stripe.api_key[:20] if stripe.api_key else 'AUCUNE'}...")
+        
+        logger.info(f"🚀 Création session 48h pour: {data.url} - {data.email}")
+        
+        # Validation basique URL
+        if not data.url or not data.url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=400, detail="URL invalide - doit commencer par http:// ou https://")
+        
+        # Validation email basique
+        if "@" not in data.email:
+            raise HTTPException(status_code=400, detail="Email invalide")
+        
+        # Création session Stripe avec métadonnées
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{"price": STRIPE_PRICE_48H, "quantity": 1}],
             mode="payment",
-            success_url=STRIPE_SUCCESS_URL,
+            success_url=STRIPE_SUCCESS_URL + "?session_id={CHECKOUT_SESSION_ID}",
             cancel_url=STRIPE_CANCEL_URL,
+            customer_email=data.email,
+            metadata={
+                "url": data.url,
+                "nom": data.nom,
+                "entreprise": data.entreprise,
+                "type": "audit_48h",
+                "email": data.email
+            }
         )
+        
+        logger.info(f"✅ Session Stripe 48h créée: {session.id}")
         return {"url": session.url}
+        
+    except stripe.error.StripeError as e:
+        logger.error(f"❌ Erreur Stripe 48h: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur Stripe: {str(e)}")
     except Exception as e:
-        logger.exception("Erreur Stripe 48h")
+        logger.error(f"❌ Erreur générale 48h: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ⭐ NOUVEAU : Webhook pour auto-lancement après paiement (optionnel pour plus tard)
+@app.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """
+    Webhook Stripe pour lancer automatiquement l'audit après paiement
+    """
+    try:
+        payload = await request.body()
+        sig_header = request.headers.get('stripe-signature')
+        
+        # ⚠️ À configurer dans Stripe Dashboard plus tard
+        endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_XXX")
+        
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+        
+        logger.info(f"🎯 Webhook Stripe reçu: {event['type']}")
+        
+        if event['type'] == 'checkout.session.completed':
+            session = event['data']['object']
+            
+            # Récupérer les métadonnées
+            url = session['metadata'].get('url')
+            email = session['metadata'].get('email', session.get('customer_email'))
+            nom = session['metadata'].get('nom', 'Client')
+            audit_type = session['metadata'].get('type', 'audit_24h')
+            
+            logger.info(f"💰 Paiement confirmé - {audit_type} pour {url} - {email}")
+            
+            # TODO: Ici tu peux lancer l'audit automatiquement
+            # ou envoyer un email de confirmation
+            
+        return {"status": "success"}
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur webhook: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 # Endpoint pour nettoyer les anciens fichiers (optionnel)
 @app.post("/admin/cleanup")
