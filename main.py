@@ -494,19 +494,44 @@ def get_scan_status(task_id: str) -> Dict[str, Any]:
 # ⭐ ENDPOINTS STRIPE CORRIGÉS
 @app.post("/create-checkout-session-24h")
 def checkout_24h(data: CheckoutRequest) -> Dict[str, str]:
+    """
+    Crée une session Stripe pour l'audit 24h avec les données client
+    """
     try:
-        # ⭐ IMPORT DIRECT
+        logger.info(f"🚀 Début création session 24h pour: {data.url} - {data.email}")
+        
+        # ⭐ DEBUG COMPLET
+        logger.info(f"🔍 STRIPE_SECRET_KEY = {STRIPE_SECRET_KEY[:20] if STRIPE_SECRET_KEY else 'NONE'}...")
+        logger.info(f"🔍 Type STRIPE_SECRET_KEY = {type(STRIPE_SECRET_KEY)}")
+        logger.info(f"🔍 STRIPE_SECRET_KEY is None? = {STRIPE_SECRET_KEY is None}")
+        
+        # ⭐ VALIDATION CLÉ AVANT IMPORT
+        if not STRIPE_SECRET_KEY or STRIPE_SECRET_KEY == "":
+            raise HTTPException(status_code=500, detail="Configuration Stripe manquante")
+        
+        # ⭐ IMPORT STRIPE LOCAL
         import stripe as st
+        logger.info(f"🔍 stripe module importé = {st}")
+        logger.info(f"🔍 stripe.checkout avant = {getattr(st, 'checkout', 'PAS_TROUVÉ')}")
+        
+        # ⭐ CONFIGURATION API KEY
         st.api_key = STRIPE_SECRET_KEY
+        logger.info(f"🔍 st.api_key configuré = {st.api_key[:20] if st.api_key else 'NONE'}...")
         
-        logger.info(f"🚀 Création session 24h pour: {data.url} - {data.email}")
-        
+        # ⭐ VALIDATION DONNÉES
         if not data.url or not data.url.startswith(("http://", "https://")):
-            raise HTTPException(status_code=400, detail="URL invalide")
+            raise HTTPException(status_code=400, detail="URL invalide - doit commencer par http:// ou https://")
         
         if "@" not in data.email:
             raise HTTPException(status_code=400, detail="Email invalide")
         
+        # ⭐ VALIDATION PRICE ID
+        if not STRIPE_PRICE_24H or STRIPE_PRICE_24H == "price_XXX":
+            raise HTTPException(status_code=500, detail="Price ID 24h non configuré")
+        
+        logger.info(f"🔍 Création session avec price: {STRIPE_PRICE_24H}")
+        
+        # ⭐ CRÉATION SESSION STRIPE
         session = st.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{"price": STRIPE_PRICE_24H, "quantity": 1}],
@@ -523,28 +548,63 @@ def checkout_24h(data: CheckoutRequest) -> Dict[str, str]:
             }
         )
         
-        logger.info(f"✅ Session 24h créée: {session.id}")
+        logger.info(f"✅ Session 24h créée avec succès: {session.id}")
+        logger.info(f"✅ URL de redirection: {session.url}")
+        
         return {"url": session.url}
         
+    except stripe.error.StripeError as e:
+        error_msg = f"Erreur Stripe 24h: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
+    except HTTPException:
+        raise  # Re-raise les HTTPException sans les wrapper
     except Exception as e:
-        logger.error(f"❌ Erreur 24h: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = f"Erreur système 24h: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        logger.exception("Stack trace complète:")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @app.post("/create-checkout-session-48h")
 def checkout_48h(data: CheckoutRequest) -> Dict[str, str]:
+    """
+    Crée une session Stripe pour l'audit 48h avec les données client
+    """
     try:
-        # ⭐ IMPORT DIRECT
+        logger.info(f"🚀 Début création session 48h pour: {data.url} - {data.email}")
+        
+        # ⭐ DEBUG COMPLET
+        logger.info(f"🔍 STRIPE_SECRET_KEY = {STRIPE_SECRET_KEY[:20] if STRIPE_SECRET_KEY else 'NONE'}...")
+        logger.info(f"🔍 Type STRIPE_SECRET_KEY = {type(STRIPE_SECRET_KEY)}")
+        logger.info(f"🔍 STRIPE_SECRET_KEY is None? = {STRIPE_SECRET_KEY is None}")
+        
+        # ⭐ VALIDATION CLÉ AVANT IMPORT
+        if not STRIPE_SECRET_KEY or STRIPE_SECRET_KEY == "":
+            raise HTTPException(status_code=500, detail="Configuration Stripe manquante")
+        
+        # ⭐ IMPORT STRIPE LOCAL
         import stripe as st
+        logger.info(f"🔍 stripe module importé = {st}")
+        logger.info(f"🔍 stripe.checkout avant = {getattr(st, 'checkout', 'PAS_TROUVÉ')}")
+        
+        # ⭐ CONFIGURATION API KEY
         st.api_key = STRIPE_SECRET_KEY
+        logger.info(f"🔍 st.api_key configuré = {st.api_key[:20] if st.api_key else 'NONE'}...")
         
-        logger.info(f"🚀 Création session 48h pour: {data.url} - {data.email}")
-        
+        # ⭐ VALIDATION DONNÉES
         if not data.url or not data.url.startswith(("http://", "https://")):
-            raise HTTPException(status_code=400, detail="URL invalide")
+            raise HTTPException(status_code=400, detail="URL invalide - doit commencer par http:// ou https://")
         
         if "@" not in data.email:
             raise HTTPException(status_code=400, detail="Email invalide")
         
+        # ⭐ VALIDATION PRICE ID
+        if not STRIPE_PRICE_48H or STRIPE_PRICE_48H == "price_YYY":
+            raise HTTPException(status_code=500, detail="Price ID 48h non configuré")
+        
+        logger.info(f"🔍 Création session avec price: {STRIPE_PRICE_48H}")
+        
+        # ⭐ CRÉATION SESSION STRIPE
         session = st.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{"price": STRIPE_PRICE_48H, "quantity": 1}],
@@ -561,12 +621,22 @@ def checkout_48h(data: CheckoutRequest) -> Dict[str, str]:
             }
         )
         
-        logger.info(f"✅ Session 48h créée: {session.id}")
+        logger.info(f"✅ Session 48h créée avec succès: {session.id}")
+        logger.info(f"✅ URL de redirection: {session.url}")
+        
         return {"url": session.url}
         
+    except stripe.error.StripeError as e:
+        error_msg = f"Erreur Stripe 48h: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
+    except HTTPException:
+        raise  # Re-raise les HTTPException sans les wrapper
     except Exception as e:
-        logger.error(f"❌ Erreur 48h: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = f"Erreur système 48h: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        logger.exception("Stack trace complète:")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 # ⭐ NOUVEAU : Webhook pour auto-lancement après paiement (optionnel pour plus tard)
 @app.post("/webhook/stripe")
