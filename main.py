@@ -493,6 +493,7 @@ def get_scan_status(task_id: str) -> Dict[str, Any]:
 
 # ⭐ ENDPOINTS STRIPE CORRIGÉS
 @app.post("/create-checkout-session-24h")
+@app.post("/create-checkout-session-24h")
 def checkout_24h(data: CheckoutRequest) -> Dict[str, str]:
     """
     Crée une session Stripe pour l'audit 24h avec les données client
@@ -500,23 +501,40 @@ def checkout_24h(data: CheckoutRequest) -> Dict[str, str]:
     try:
         logger.info(f"🚀 Début création session 24h pour: {data.url} - {data.email}")
         
-        # ⭐ DEBUG COMPLET
-        logger.info(f"🔍 STRIPE_SECRET_KEY = {STRIPE_SECRET_KEY[:20] if STRIPE_SECRET_KEY else 'NONE'}...")
-        logger.info(f"🔍 Type STRIPE_SECRET_KEY = {type(STRIPE_SECRET_KEY)}")
-        logger.info(f"🔍 STRIPE_SECRET_KEY is None? = {STRIPE_SECRET_KEY is None}")
-        
         # ⭐ VALIDATION CLÉ AVANT IMPORT
         if not STRIPE_SECRET_KEY or STRIPE_SECRET_KEY == "":
             raise HTTPException(status_code=500, detail="Configuration Stripe manquante")
         
-        # ⭐ IMPORT STRIPE LOCAL
+        # ⭐ IMPORT STRIPE LOCAL + DÉTECTION CHEMIN
         import stripe as st
-        logger.info(f"🔍 stripe module importé = {st}")
-        logger.info(f"🔍 stripe.checkout avant = {getattr(st, 'checkout', 'PAS_TROUVÉ')}")
-        
-        # ⭐ CONFIGURATION API KEY
         st.api_key = STRIPE_SECRET_KEY
-        logger.info(f"🔍 st.api_key configuré = {st.api_key[:20] if st.api_key else 'NONE'}...")
+        
+        logger.info(f"🔍 Recherche de la classe Session...")
+        logger.info(f"🔍 st.checkout = {st.checkout}")
+        logger.info(f"🔍 dir(st.checkout) = {dir(st.checkout)}")
+        
+        # ⭐ DÉTECTION AUTOMATIQUE DU BON CHEMIN STRIPE
+        SessionClass = None
+        
+        # Essaye les différents chemins possibles
+        if hasattr(st.checkout, 'Session'):
+            SessionClass = st.checkout.Session
+            logger.info("✅ Trouvé: st.checkout.Session")
+        elif hasattr(st.checkout, 'session') and hasattr(st.checkout.session, 'Session'):
+            SessionClass = st.checkout.session.Session
+            logger.info("✅ Trouvé: st.checkout.session.Session")
+        elif hasattr(st, 'checkout') and hasattr(st.checkout, 'sessions') and hasattr(st.checkout.sessions, 'Session'):
+            SessionClass = st.checkout.sessions.Session
+            logger.info("✅ Trouvé: st.checkout.sessions.Session")
+        else:
+            # Import direct en dernier recours
+            from stripe.checkout.session import Session as SessionClass
+            logger.info("✅ Import direct: from stripe.checkout.session import Session")
+        
+        if not SessionClass:
+            raise Exception("Impossible de trouver la classe Session de Stripe")
+        
+        logger.info(f"🔍 SessionClass = {SessionClass}")
         
         # ⭐ VALIDATION DONNÉES
         if not data.url or not data.url.startswith(("http://", "https://")):
@@ -531,8 +549,8 @@ def checkout_24h(data: CheckoutRequest) -> Dict[str, str]:
         
         logger.info(f"🔍 Création session avec price: {STRIPE_PRICE_24H}")
         
-        # ⭐ CRÉATION SESSION STRIPE
-        session = st.checkout.Session.create(
+        # ⭐ CRÉATION SESSION STRIPE AVEC LA BONNE CLASSE
+        session = SessionClass.create(
             payment_method_types=["card"],
             line_items=[{"price": STRIPE_PRICE_24H, "quantity": 1}],
             mode="payment",
@@ -553,6 +571,10 @@ def checkout_24h(data: CheckoutRequest) -> Dict[str, str]:
         
         return {"url": session.url}
         
+    except ImportError as e:
+        error_msg = f"Erreur import Stripe 24h: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        raise HTTPException(status_code=500, detail="Module Stripe mal installé")
     except stripe.error.StripeError as e:
         error_msg = f"Erreur Stripe 24h: {str(e)}"
         logger.error(f"❌ {error_msg}")
@@ -573,23 +595,40 @@ def checkout_48h(data: CheckoutRequest) -> Dict[str, str]:
     try:
         logger.info(f"🚀 Début création session 48h pour: {data.url} - {data.email}")
         
-        # ⭐ DEBUG COMPLET
-        logger.info(f"🔍 STRIPE_SECRET_KEY = {STRIPE_SECRET_KEY[:20] if STRIPE_SECRET_KEY else 'NONE'}...")
-        logger.info(f"🔍 Type STRIPE_SECRET_KEY = {type(STRIPE_SECRET_KEY)}")
-        logger.info(f"🔍 STRIPE_SECRET_KEY is None? = {STRIPE_SECRET_KEY is None}")
-        
         # ⭐ VALIDATION CLÉ AVANT IMPORT
         if not STRIPE_SECRET_KEY or STRIPE_SECRET_KEY == "":
             raise HTTPException(status_code=500, detail="Configuration Stripe manquante")
         
-        # ⭐ IMPORT STRIPE LOCAL
+        # ⭐ IMPORT STRIPE LOCAL + DÉTECTION CHEMIN
         import stripe as st
-        logger.info(f"🔍 stripe module importé = {st}")
-        logger.info(f"🔍 stripe.checkout avant = {getattr(st, 'checkout', 'PAS_TROUVÉ')}")
-        
-        # ⭐ CONFIGURATION API KEY
         st.api_key = STRIPE_SECRET_KEY
-        logger.info(f"🔍 st.api_key configuré = {st.api_key[:20] if st.api_key else 'NONE'}...")
+        
+        logger.info(f"🔍 Recherche de la classe Session...")
+        logger.info(f"🔍 st.checkout = {st.checkout}")
+        logger.info(f"🔍 dir(st.checkout) = {dir(st.checkout)}")
+        
+        # ⭐ DÉTECTION AUTOMATIQUE DU BON CHEMIN STRIPE
+        SessionClass = None
+        
+        # Essaye les différents chemins possibles
+        if hasattr(st.checkout, 'Session'):
+            SessionClass = st.checkout.Session
+            logger.info("✅ Trouvé: st.checkout.Session")
+        elif hasattr(st.checkout, 'session') and hasattr(st.checkout.session, 'Session'):
+            SessionClass = st.checkout.session.Session
+            logger.info("✅ Trouvé: st.checkout.session.Session")
+        elif hasattr(st, 'checkout') and hasattr(st.checkout, 'sessions') and hasattr(st.checkout.sessions, 'Session'):
+            SessionClass = st.checkout.sessions.Session
+            logger.info("✅ Trouvé: st.checkout.sessions.Session")
+        else:
+            # Import direct en dernier recours
+            from stripe.checkout.session import Session as SessionClass
+            logger.info("✅ Import direct: from stripe.checkout.session import Session")
+        
+        if not SessionClass:
+            raise Exception("Impossible de trouver la classe Session de Stripe")
+        
+        logger.info(f"🔍 SessionClass = {SessionClass}")
         
         # ⭐ VALIDATION DONNÉES
         if not data.url or not data.url.startswith(("http://", "https://")):
@@ -604,8 +643,8 @@ def checkout_48h(data: CheckoutRequest) -> Dict[str, str]:
         
         logger.info(f"🔍 Création session avec price: {STRIPE_PRICE_48H}")
         
-        # ⭐ CRÉATION SESSION STRIPE
-        session = st.checkout.Session.create(
+        # ⭐ CRÉATION SESSION STRIPE AVEC LA BONNE CLASSE
+        session = SessionClass.create(
             payment_method_types=["card"],
             line_items=[{"price": STRIPE_PRICE_48H, "quantity": 1}],
             mode="payment",
@@ -626,6 +665,10 @@ def checkout_48h(data: CheckoutRequest) -> Dict[str, str]:
         
         return {"url": session.url}
         
+    except ImportError as e:
+        error_msg = f"Erreur import Stripe 48h: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        raise HTTPException(status_code=500, detail="Module Stripe mal installé")
     except stripe.error.StripeError as e:
         error_msg = f"Erreur Stripe 48h: {str(e)}"
         logger.error(f"❌ {error_msg}")
