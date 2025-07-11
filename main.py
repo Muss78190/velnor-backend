@@ -494,30 +494,20 @@ def get_scan_status(task_id: str) -> Dict[str, Any]:
 # ⭐ ENDPOINTS STRIPE CORRIGÉS
 @app.post("/create-checkout-session-24h")
 def checkout_24h(data: CheckoutRequest) -> Dict[str, str]:
-    """
-    Crée une session Stripe pour l'audit 24h avec les données client
-    """
     try:
-        # ⭐ LIGNES DE DEBUG
-        logger.info(f"🔍 DEBUG 24h: stripe.api_key dans fonction = {stripe.api_key[:20] if stripe.api_key else 'AUCUNE'}...")
-        logger.info(f"🔍 DEBUG 24h: STRIPE_SECRET_KEY variable = {STRIPE_SECRET_KEY[:20] if STRIPE_SECRET_KEY else 'AUCUNE'}...")
-        
-        # ⭐ FORCE LA CLÉ
-        stripe.api_key = STRIPE_SECRET_KEY
-        logger.info(f"🔍 DEBUG 24h: Après force = {stripe.api_key[:20] if stripe.api_key else 'AUCUNE'}...")
+        # ⭐ IMPORT DIRECT
+        import stripe as st
+        st.api_key = STRIPE_SECRET_KEY
         
         logger.info(f"🚀 Création session 24h pour: {data.url} - {data.email}")
         
-        # Validation basique URL
         if not data.url or not data.url.startswith(("http://", "https://")):
-            raise HTTPException(status_code=400, detail="URL invalide - doit commencer par http:// ou https://")
+            raise HTTPException(status_code=400, detail="URL invalide")
         
-        # Validation email basique
         if "@" not in data.email:
             raise HTTPException(status_code=400, detail="Email invalide")
         
-        # Création session Stripe avec métadonnées
-        session = stripe.checkout.Session.create(
+        session = st.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{"price": STRIPE_PRICE_24H, "quantity": 1}],
             mode="payment",
@@ -533,42 +523,29 @@ def checkout_24h(data: CheckoutRequest) -> Dict[str, str]:
             }
         )
         
-        logger.info(f"✅ Session Stripe 24h créée: {session.id}")
+        logger.info(f"✅ Session 24h créée: {session.id}")
         return {"url": session.url}
         
-    except stripe.error.StripeError as e:
-        logger.error(f"❌ Erreur Stripe 24h: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur Stripe: {str(e)}")
     except Exception as e:
-        logger.error(f"❌ Erreur générale 24h: {e}")
+        logger.error(f"❌ Erreur 24h: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/create-checkout-session-48h")
 def checkout_48h(data: CheckoutRequest) -> Dict[str, str]:
-    """
-    Crée une session Stripe pour l'audit 48h avec les données client
-    """
     try:
-        # ⭐ LIGNES DE DEBUG
-        logger.info(f"🔍 DEBUG 48h: stripe.api_key dans fonction = {stripe.api_key[:20] if stripe.api_key else 'AUCUNE'}...")
-        logger.info(f"🔍 DEBUG 48h: STRIPE_SECRET_KEY variable = {STRIPE_SECRET_KEY[:20] if STRIPE_SECRET_KEY else 'AUCUNE'}...")
-        
-        # ⭐ FORCE LA CLÉ
-        stripe.api_key = STRIPE_SECRET_KEY
-        logger.info(f"🔍 DEBUG 48h: Après force = {stripe.api_key[:20] if stripe.api_key else 'AUCUNE'}...")
+        # ⭐ IMPORT DIRECT
+        import stripe as st
+        st.api_key = STRIPE_SECRET_KEY
         
         logger.info(f"🚀 Création session 48h pour: {data.url} - {data.email}")
         
-        # Validation basique URL
         if not data.url or not data.url.startswith(("http://", "https://")):
-            raise HTTPException(status_code=400, detail="URL invalide - doit commencer par http:// ou https://")
+            raise HTTPException(status_code=400, detail="URL invalide")
         
-        # Validation email basique
         if "@" not in data.email:
             raise HTTPException(status_code=400, detail="Email invalide")
         
-        # Création session Stripe avec métadonnées
-        session = stripe.checkout.Session.create(
+        session = st.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{"price": STRIPE_PRICE_48H, "quantity": 1}],
             mode="payment",
@@ -584,14 +561,11 @@ def checkout_48h(data: CheckoutRequest) -> Dict[str, str]:
             }
         )
         
-        logger.info(f"✅ Session Stripe 48h créée: {session.id}")
+        logger.info(f"✅ Session 48h créée: {session.id}")
         return {"url": session.url}
         
-    except stripe.error.StripeError as e:
-        logger.error(f"❌ Erreur Stripe 48h: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur Stripe: {str(e)}")
     except Exception as e:
-        logger.error(f"❌ Erreur générale 48h: {e}")
+        logger.error(f"❌ Erreur 48h: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ⭐ NOUVEAU : Webhook pour auto-lancement après paiement (optionnel pour plus tard)
